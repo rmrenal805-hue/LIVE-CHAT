@@ -2184,7 +2184,7 @@ export default function App() {
                     required
                     value={adminLoginUsername}
                     onChange={(e) => setAdminLoginUsername(e.target.value)}
-                    placeholder="ইউজারনেম লিখুন (যেমন: zoha366 বা arif)"
+                    placeholder="ইউজারনেম লিখুন"
                     className="w-full p-3 pl-10 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
@@ -2205,47 +2205,6 @@ export default function App() {
                     className="w-full p-3 pl-10 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
                   />
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-600">
-                <div className="text-[11px] font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                  <span>⚡ দ্রুত লগইন (Quick Fill):</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminLoginUsername('zoha366');
-                      setAdminLoginPassword('01723993331aa');
-                      setAdminLoginError('');
-                    }}
-                    className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg text-[11px] font-medium text-slate-700 transition cursor-pointer"
-                  >
-                    👤 এজেন্ট জোহার (zoha366)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminLoginUsername('arif');
-                      setAdminLoginPassword('agent123');
-                      setAdminLoginError('');
-                    }}
-                    className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg text-[11px] font-medium text-slate-700 transition cursor-pointer"
-                  >
-                    👤 এজেন্ট আরিফ (arif)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminLoginUsername('saju2470');
-                      setAdminLoginPassword('20203494aa');
-                      setAdminLoginError('');
-                    }}
-                    className="px-2 py-1 bg-white border border-slate-200 hover:border-purple-400 hover:bg-purple-50 rounded-lg text-[11px] font-medium text-purple-700 transition cursor-pointer"
-                  >
-                    👑 এডমিন সাজু (saju2470)
-                  </button>
                 </div>
               </div>
 
