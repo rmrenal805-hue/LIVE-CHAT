@@ -73,5 +73,23 @@
       },
       "required": ["id", "location", "device", "status"]
     }
+  },
+  "firestore": {
+    "/chats/{chatId}": {
+      "schema": "chats",
+      "description": "Collection of all live chat sessions"
+    },
+    "/messages/{messageId}": {
+      "schema": "messages",
+      "description": "Collection of messages in chats"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Widget and application configuration settings"
+    },
+    "/visitors/{visitorId}": {
+      "schema": "visitors",
+      "description": "Live active website visitors and tracking metrics"
+    }
   }
 }

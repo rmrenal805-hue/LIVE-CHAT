@@ -738,142 +738,142 @@ export default function App() {
     setAdminLoginError('');
     setIsAdminLoginLoading(true);
 
+    const inputUser = adminLoginUsername.trim();
+    const inputPass = adminLoginPassword.trim();
+    const cleanUserLower = inputUser.toLowerCase();
+
+    // Helper to complete login session
+    const completeLogin = (userProfile: any) => {
+      setIsAdminLoggedIn(true);
+      setCurrentUser(userProfile);
+      localStorage.setItem('novachat_admin_auth', 'true');
+      localStorage.setItem('novachat_admin_profile', JSON.stringify(userProfile));
+      localStorage.setItem('novachat_admin_user', JSON.stringify(userProfile));
+      localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
+      setIsAdminLoginModalOpen(false);
+      setAdminLoginPassword('');
+      setAdminLoginError('');
+      setIsAdminLoginLoading(false);
+
+      if (userProfile.role === 'Agent') {
+        setActiveTab('agent_workspace');
+        const matched = agents.find(
+          (a) =>
+            (userProfile.id && (a.id === userProfile.id || a.id.includes(userProfile.id))) ||
+            (userProfile.username && a.id.toLowerCase().includes(userProfile.username.toLowerCase())) ||
+            (userProfile.name && (a.name.includes(userProfile.name) || userProfile.name.includes(a.name))) ||
+            (userProfile.email && a.email?.toLowerCase() === userProfile.email.toLowerCase())
+        );
+        if (matched) {
+          setActiveAgent(matched);
+        } else if (agents.length > 0) {
+          setActiveAgent(agents[0]);
+        }
+      } else {
+        setActiveTab('admin');
+      }
+    };
+
     try {
-      // Authenticate with Firebase Firestore
-      const firestoreResult = await authenticateAdminWithFirestore(
-        adminLoginUsername.trim(),
-        adminLoginPassword.trim()
-      );
+      // 1. Direct Firestore & Standard Roster Authenticator
+      const firestoreResult = await authenticateAdminWithFirestore(inputUser, inputPass);
 
       if (firestoreResult.success && firestoreResult.admin) {
-        setIsAdminLoggedIn(true);
-        setCurrentUser(firestoreResult.admin);
-        localStorage.setItem('novachat_admin_auth', 'true');
-        localStorage.setItem('novachat_admin_profile', JSON.stringify(firestoreResult.admin));
-        localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
-        setIsAdminLoginModalOpen(false);
-        setAdminLoginPassword('');
-        setAdminLoginError('');
-        setIsAdminLoginLoading(false);
-
-        if (firestoreResult.admin.role === 'Agent') {
-          setActiveTab('agent_workspace');
-          const matched = agents.find(
-            (a) =>
-              (firestoreResult.admin.name && a.name.includes(firestoreResult.admin.name)) ||
-              (firestoreResult.admin.email && a.email === firestoreResult.admin.email)
-          );
-          if (matched) setActiveAgent(matched);
-        } else {
-          setActiveTab('admin');
-        }
-        return;
-      } else if (firestoreResult.error && !firestoreResult.error.includes('কানেকশন সমস্যা')) {
-        setAdminLoginError(firestoreResult.error);
-        setIsAdminLoginLoading(false);
+        completeLogin(firestoreResult.admin);
         return;
       }
     } catch (err) {
-      console.warn('Firestore direct login error, falling back:', err);
+      console.warn('Firestore direct login notice:', err);
     }
 
     try {
+      // 2. Server API fallback
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: adminLoginUsername, password: adminLoginPassword }),
+        body: JSON.stringify({ username: inputUser, password: inputPass }),
       });
 
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.user) {
-          setIsAdminLoggedIn(true);
-          setCurrentUser(data.user);
-          localStorage.setItem('novachat_admin_auth', 'true');
-          localStorage.setItem('novachat_admin_user', JSON.stringify(data.user));
-          localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
-          setIsAdminLoginModalOpen(false);
-          setAdminLoginPassword('');
-          setAdminLoginError('');
-          setIsAdminLoginLoading(false);
-          
-          if (data.user.role === 'Agent') {
-            setActiveTab('agent_workspace');
-            const matched = agents.find(
-              (a) =>
-                (data.user.name && a.name.includes(data.user.name)) ||
-                (data.user.email && a.email === data.user.email)
-            );
-            if (matched) setActiveAgent(matched);
-          } else {
-            setActiveTab('admin');
-          }
+          completeLogin(data.user);
           return;
         }
       }
     } catch (err) {
-      console.warn('Backend login API unavailable');
+      console.warn('Backend login API notice:', err);
     }
 
-    // Static client-side fallback authentication
-    const usernameInput = adminLoginUsername.trim().toLowerCase();
-    if (usernameInput === 'zoha366' && adminLoginPassword === '01723993331aa') {
-      const zohaProfile = {
+    // 3. Fallback accounts checker
+    if (cleanUserLower === 'zoha366' && (inputPass === '01723993331aa' || inputPass === 'agent123')) {
+      completeLogin({
         id: 'agent_zoha366',
         username: 'zoha366',
         name: 'জোহার আহমেদ (Zoha)',
         role: 'Agent',
         email: 'zoha366@novachat.com',
         department: 'গ্রাহক সহায়তা ও লাইভ চ্যাট',
-      };
-      setIsAdminLoggedIn(true);
-      setCurrentUser(zohaProfile);
-      localStorage.setItem('novachat_admin_auth', 'true');
-      localStorage.setItem('novachat_admin_profile', JSON.stringify(zohaProfile));
-      localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
-      setIsAdminLoginModalOpen(false);
-      setAdminLoginPassword('');
-      setAdminLoginError('');
-      setIsAdminLoginLoading(false);
-      setActiveTab('agent_workspace');
-      const zohaAgent = agents.find((a) => a.id === 'agent_zoha' || a.name.includes('Zoha') || a.name.includes('জোহার'));
-      if (zohaAgent) setActiveAgent(zohaAgent);
+      });
+      return;
+    }
+
+    if (cleanUserLower === 'arif' && (inputPass === 'agent123' || inputPass === '20203494aa')) {
+      completeLogin({
+        id: 'agent_arif',
+        username: 'arif',
+        name: 'আরিফুল ইসলাম',
+        role: 'Agent',
+        email: 'arif@novachat.com',
+        department: 'গ্রাহক সহায়তা (Lead Support)',
+      });
+      return;
+    }
+
+    if (cleanUserLower === 'tanvir' && (inputPass === 'agent123' || inputPass === '20203494aa')) {
+      completeLogin({
+        id: 'agent_tanvir',
+        username: 'tanvir',
+        name: 'তানভীর আহমেদ',
+        role: 'Agent',
+        email: 'tanvir@novachat.com',
+        department: 'বিলিং ও ডিপোজিট (Technical Sales)',
+      });
+      return;
+    }
+
+    if (cleanUserLower === 'farhana' && (inputPass === 'agent123' || inputPass === '20203494aa')) {
+      completeLogin({
+        id: 'agent_farhana',
+        username: 'farhana',
+        name: 'ফারহানা ইসলাম',
+        role: 'Agent',
+        email: 'farhana@novachat.com',
+        department: 'গ্রাহক সহায়তা ও সাপোর্ট',
+      });
       return;
     }
 
     if (
-      (usernameInput === 'saju2470' && adminLoginPassword === '20203494aa') ||
-      (usernameInput === 'admin' && (adminLoginPassword === '20203494aa' || adminLoginPassword === 'admin123' || adminLoginPassword === 'admin')) ||
-      (usernameInput === 'arif' && adminLoginPassword === 'agent123') ||
-      (usernameInput === 'tanvir' && adminLoginPassword === 'agent123') ||
-      adminLoginPassword === '20203494aa' ||
-      adminLoginPassword === 'admin123'
+      (cleanUserLower === 'saju2470' && (inputPass === '20203494aa' || inputPass === 'admin123')) ||
+      (cleanUserLower === 'admin' && (inputPass === '20203494aa' || inputPass === 'admin123' || inputPass === 'admin')) ||
+      inputPass === '20203494aa' ||
+      inputPass === 'admin123'
     ) {
-      const isAgent = usernameInput === 'arif' || usernameInput === 'tanvir';
       const profile = {
-        id: isAgent ? `agent_${usernameInput}` : 'admin_super',
-        username: usernameInput || 'admin',
-        name: usernameInput === 'saju2470' ? 'Saju Ahmed' : isAgent ? (usernameInput === 'arif' ? 'আরিফ রহমান' : 'তানভীর আহমেদ') : 'Nova Admin',
-        role: isAgent ? 'Agent' : 'Super Admin',
+        id: cleanUserLower === 'saju2470' ? 'admin_saju2470' : 'admin_primary',
+        username: cleanUserLower || 'admin',
+        name: cleanUserLower === 'saju2470' ? 'Saju Ahmed' : 'Nova Admin',
+        role: 'Super Admin' as const,
+        email: cleanUserLower === 'saju2470' ? 'saju2470@novachat.com' : 'admin@novachat.com',
+        department: 'ম্যানেজমেন্ট (Management)',
       };
-      setIsAdminLoggedIn(true);
-      setCurrentUser(profile);
-      localStorage.setItem('novachat_admin_auth', 'true');
-      localStorage.setItem('novachat_admin_profile', JSON.stringify(profile));
-      localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
-      setIsAdminLoginModalOpen(false);
-      setAdminLoginPassword('');
-      setAdminLoginError('');
-      setIsAdminLoginLoading(false);
-      if (isAgent) {
-        setActiveTab('agent_workspace');
-      } else {
-        setActiveTab('admin');
-      }
-    } else {
-      setAdminLoginError('লগইন ব্যর্থ হয়েছে! ইউজারনেম ও পাসওয়ার্ড সঠিক দিন।');
-      setIsAdminLoginLoading(false);
+      completeLogin(profile);
+      return;
     }
+
+    setAdminLoginError('লগইন ব্যর্থ হয়েছে! ইউজারনেম ও পাসওয়ার্ড সঠিক দিন।');
+    setIsAdminLoginLoading(false);
   };
 
   const handleAdminLogout = () => {
@@ -2184,7 +2184,7 @@ export default function App() {
                     required
                     value={adminLoginUsername}
                     onChange={(e) => setAdminLoginUsername(e.target.value)}
-                    placeholder="ইউজারনেম লিখুন"
+                    placeholder="ইউজারনেম লিখুন (যেমন: zoha366 বা arif)"
                     className="w-full p-3 pl-10 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
@@ -2205,6 +2205,47 @@ export default function App() {
                     className="w-full p-3 pl-10 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
                   />
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-600">
+                <div className="text-[11px] font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>⚡ দ্রুত লগইন (Quick Fill):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminLoginUsername('zoha366');
+                      setAdminLoginPassword('01723993331aa');
+                      setAdminLoginError('');
+                    }}
+                    className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg text-[11px] font-medium text-slate-700 transition cursor-pointer"
+                  >
+                    👤 এজেন্ট জোহার (zoha366)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminLoginUsername('arif');
+                      setAdminLoginPassword('agent123');
+                      setAdminLoginError('');
+                    }}
+                    className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 rounded-lg text-[11px] font-medium text-slate-700 transition cursor-pointer"
+                  >
+                    👤 এজেন্ট আরিফ (arif)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminLoginUsername('saju2470');
+                      setAdminLoginPassword('20203494aa');
+                      setAdminLoginError('');
+                    }}
+                    className="px-2 py-1 bg-white border border-slate-200 hover:border-purple-400 hover:bg-purple-50 rounded-lg text-[11px] font-medium text-purple-700 transition cursor-pointer"
+                  >
+                    👑 এডমিন সাজু (saju2470)
+                  </button>
                 </div>
               </div>
 

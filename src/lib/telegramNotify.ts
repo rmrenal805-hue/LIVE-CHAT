@@ -41,48 +41,74 @@ function dataURItoBlob(dataURI: string): Blob {
 
 /**
  * Sends real-time Telegram notifications when a customer starts a chat, sends a message/photo, or submits a report
+ * Dispatches to all configured Telegram channels in parallel
  */
 export async function sendTelegramNotification(
   params: TelegramNotificationParams,
   widgetConfig?: Partial<WidgetConfig>
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // 1. Retrieve bot token & chat id from passed widgetConfig or localStorage
-    let botToken = widgetConfig?.telegramBotToken;
-    let chatId = widgetConfig?.telegramChatId;
-    let isEnabled = widgetConfig?.telegramNotificationsEnabled !== false;
+    // Collect all targets
+    interface Target {
+      token: string;
+      chatId: string;
+      name?: string;
+    }
+    const targets: Target[] = [];
+    const added = new Set<string>();
 
-    if (!botToken || !chatId) {
-      try {
-        const localCfg = localStorage.getItem('novachat_widget_config');
-        if (localCfg) {
-          const parsed = JSON.parse(localCfg);
-          botToken = botToken || parsed.telegramBotToken;
-          chatId = chatId || parsed.telegramChatId;
-          if (parsed.telegramNotificationsEnabled !== undefined) {
-            isEnabled = parsed.telegramNotificationsEnabled;
-          }
-        }
-      } catch (e) {
-        console.warn('Error reading telegram config from localStorage', e);
+    const addT = (token?: string, cId?: string, name?: string) => {
+      if (!token || !cId) return;
+      const t = token.trim();
+      const c = cId.trim();
+      if (!t || !c) return;
+      const key = `${t}_${c}`;
+      if (!added.has(key)) {
+        added.add(key);
+        targets.push({ token: t, chatId: c, name });
       }
+    };
+
+    // 1. From passed config bots
+    if (widgetConfig?.telegramBots && Array.isArray(widgetConfig.telegramBots)) {
+      widgetConfig.telegramBots.forEach((b) => {
+        if (b.enabled !== false && b.botToken && b.chatId) {
+          addT(b.botToken, b.chatId, b.name);
+        }
+      });
     }
 
-    // Default Fallback to user's Telegram Bot and Chat ID
-    if (!botToken) {
-      botToken = '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4';
-    }
-    if (!chatId) {
-      chatId = '6331230671';
+    // 2. From passed primary fields
+    if (widgetConfig?.telegramBotToken && widgetConfig?.telegramChatId) {
+      addT(widgetConfig.telegramBotToken, widgetConfig.telegramChatId);
     }
 
-    // If notifications are explicitly disabled by user
-    if (!isEnabled && params.type !== 'test') {
+    // 3. From localStorage
+    try {
+      const localCfg = localStorage.getItem('novachat_widget_config');
+      if (localCfg) {
+        const parsed = JSON.parse(localCfg);
+        if (parsed.telegramBots && Array.isArray(parsed.telegramBots)) {
+          parsed.telegramBots.forEach((b: any) => {
+            if (b.enabled !== false && b.botToken && b.chatId) {
+              addT(b.botToken, b.chatId, b.name);
+            }
+          });
+        }
+        if (parsed.telegramBotToken && parsed.telegramChatId) {
+          addT(parsed.telegramBotToken, parsed.telegramChatId);
+        }
+      }
+    } catch (e) {}
+
+    // 4. Guaranteed defaults
+    addT('8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4', '6331230671', 'Primary Bot');
+    addT('8753033604:AAFE7Y99dJwN-F8h58OMywO1QW_7iqrkDcM', '6081054558', 'Multi Bot');
+
+    if (widgetConfig?.telegramNotificationsEnabled === false && params.type !== 'test') {
       return { success: false, message: 'টেলিগ্রাম নোটিফিকেশন বন্ধ করা আছে।' };
     }
 
-    const cleanToken = botToken.trim();
-    const cleanChatId = chatId.trim();
     const timeStr = params.timestamp || new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     let messageText = '';
@@ -136,69 +162,66 @@ export async function sendTelegramNotification(
       }
     }
 
-    // Case 1: Send Photo via Telegram sendPhoto endpoint
-    if (targetPhoto) {
-      try {
-        if (targetPhoto.startsWith('data:image')) {
-          // Base64 Data URL -> Send as multipart FormData
-          const blob = dataURItoBlob(targetPhoto);
-          const formData = new FormData();
-          formData.append('chat_id', cleanChatId);
-          formData.append('photo', blob, params.photoName || 'customer_photo.jpg');
-          formData.append('caption', messageText.slice(0, 1024)); // Telegram caption limit 1024 chars
-          formData.append('parse_mode', 'HTML');
+    const sendResults = await Promise.allSettled(
+      targets.map(async (t) => {
+        if (targetPhoto) {
+          try {
+            if (targetPhoto.startsWith('data:image')) {
+              const blob = dataURItoBlob(targetPhoto);
+              const formData = new FormData();
+              formData.append('chat_id', t.chatId);
+              formData.append('photo', blob, params.photoName || 'customer_photo.jpg');
+              formData.append('caption', messageText.slice(0, 1024));
+              formData.append('parse_mode', 'HTML');
 
-          const photoRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendPhoto`, {
-            method: 'POST',
-            body: formData,
-          });
-          const photoData = await photoRes.json();
-          if (photoData && photoData.ok) {
-            return { success: true, message: 'টেলিগ্রামে ছবিসহ নোটিফিকেশন পাঠানো হয়েছে!' };
-          }
-        } else if (targetPhoto.startsWith('http://') || targetPhoto.startsWith('https://')) {
-          // Regular HTTP URL
-          const photoRes = await fetch(`https://api.telegram.org/bot${cleanToken}/sendPhoto`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: cleanChatId,
-              photo: targetPhoto,
-              caption: messageText.slice(0, 1024),
-              parse_mode: 'HTML',
-            }),
-          });
-          const photoData = await photoRes.json();
-          if (photoData && photoData.ok) {
-            return { success: true, message: 'টেলিগ্রামে ছবিসহ নোটিফিকেশন পাঠানো হয়েছে!' };
+              const photoRes = await fetch(`https://api.telegram.org/bot${t.token}/sendPhoto`, {
+                method: 'POST',
+                body: formData,
+              });
+              const photoData = await photoRes.json();
+              if (photoData && photoData.ok) return true;
+            } else if (targetPhoto.startsWith('http://') || targetPhoto.startsWith('https://')) {
+              const photoRes = await fetch(`https://api.telegram.org/bot${t.token}/sendPhoto`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: t.chatId,
+                  photo: targetPhoto,
+                  caption: messageText.slice(0, 1024),
+                  parse_mode: 'HTML',
+                }),
+              });
+              const photoData = await photoRes.json();
+              if (photoData && photoData.ok) return true;
+            }
+          } catch (pe) {
+            console.warn('Error sending photo, falling back to text:', pe);
           }
         }
-      } catch (photoErr) {
-        console.warn('Error sending photo to Telegram, falling back to text:', photoErr);
-      }
-    }
 
-    // Case 2: Standard Text Message via sendMessage endpoint
-    const telegramUrl = `https://api.telegram.org/bot${cleanToken}/sendMessage`;
-    const response = await fetch(telegramUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        chat_id: cleanChatId,
-        text: messageText,
-        parse_mode: 'HTML',
-      }),
-    });
+        const telegramUrl = `https://api.telegram.org/bot${t.token}/sendMessage`;
+        const response = await fetch(telegramUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: t.chatId,
+            text: messageText,
+            parse_mode: 'HTML',
+          }),
+        });
+        const resData = await response.json();
+        return resData && resData.ok;
+      })
+    );
 
-    const resData = await response.json();
-    if (resData && resData.ok) {
-      return { success: true, message: 'টেলিগ্রামে সফলভাবে নোটিফিকেশন পাঠানো হয়েছে!' };
+    const successful = sendResults.filter(
+      (r) => r.status === 'fulfilled' && r.value === true
+    ).length;
+
+    if (successful > 0) {
+      return { success: true, message: `${successful} টি টেলিগ্রামে সফলভাবে নোটিফিকেশন পাঠানো হয়েছে!` };
     } else {
-      const errMsg = resData?.description || 'টেলিগ্রাম এপিআই ত্রুটি';
-      console.warn('Telegram Notification Error:', errMsg);
-      return { success: false, message: `টেলিগ্রাম ত্রুটি: ${errMsg}` };
+      return { success: false, message: 'টেলিগ্রাম বার্তা পাঠাতে ব্যর্থ হয়েছে।' };
     }
   } catch (error: any) {
     console.error('Failed to send Telegram notification:', error);

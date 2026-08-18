@@ -103,6 +103,16 @@ let adminUsers: AdminUser[] = [
     createdAt: new Date().toISOString(),
   },
   {
+    id: 'user_agent_3',
+    username: 'farhana',
+    password: 'agent123',
+    name: 'ফারহানা ইসলাম',
+    role: 'Agent',
+    email: 'farhana@support.bd',
+    department: 'গ্রাহক সহায়তা ও সাপোর্ট',
+    createdAt: new Date().toISOString(),
+  },
+  {
     id: 'user_agent_zoha',
     username: 'zoha366',
     password: '01723993331aa',

@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import firebaseAppletConfig from "../../firebase-applet-config.json";
 
 const getEnv = (key: string): string | undefined => {
@@ -26,8 +27,13 @@ export const config = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(config) : getApp();
 
-// Get Firestore instance
-export const db = getFirestore(app);
+// Get Firestore instance with specified database ID
+export const db = config.firestoreDatabaseId && config.firestoreDatabaseId !== '(default)'
+  ? getFirestore(app, config.firestoreDatabaseId)
+  : getFirestore(app);
+
+// Get Auth instance
+export const auth = getAuth(app);
 
 
 
