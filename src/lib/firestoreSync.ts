@@ -1,7 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
-  initializeFirestore,
-  getFirestore,
   collection,
   doc,
   setDoc,
@@ -12,47 +9,9 @@ import {
   orderBy,
   where
 } from 'firebase/firestore';
-import firebaseAppletConfig from '../../firebase-applet-config.json';
+import { db, app as firebaseApp } from './firebase';
 
-const getEnv = (key: string): string | undefined => {
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
-  }
-  try {
-    return (import.meta as any)?.env?.[key];
-  } catch (e) {
-    return undefined;
-  }
-};
-
-const firebaseConfig = {
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || firebaseAppletConfig.projectId,
-  appId: getEnv('VITE_FIREBASE_APP_ID') || firebaseAppletConfig.appId,
-  apiKey: getEnv('VITE_FIREBASE_API_KEY') || firebaseAppletConfig.apiKey,
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || firebaseAppletConfig.authDomain,
-  firestoreDatabaseId: getEnv('VITE_FIREBASE_DATABASE_ID') || firebaseAppletConfig.firestoreDatabaseId,
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || firebaseAppletConfig.storageBucket,
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') || firebaseAppletConfig.messagingSenderId,
-};
-
-// Initialize Firebase App
-export const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Get Firestore instance for specific database ID
-const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId.trim() !== '')
-  ? firebaseConfig.firestoreDatabaseId
-  : '(default)';
-
-let firestoreDb: any;
-try {
-  firestoreDb = initializeFirestore(firebaseApp, {
-    experimentalAutoDetectLongPolling: true,
-  }, dbId);
-} catch (e) {
-  firestoreDb = getFirestore(firebaseApp, dbId);
-}
-
-export const db = firestoreDb;
+export { db, firebaseApp };
 
 // Collection References
 const CHATS_COL = 'chats';

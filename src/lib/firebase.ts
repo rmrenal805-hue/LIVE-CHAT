@@ -13,7 +13,7 @@ const getEnv = (key: string): string | undefined => {
   }
 };
 
-const config = {
+export const config = {
   projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || firebaseAppletConfig.projectId,
   appId: getEnv('VITE_FIREBASE_APP_ID') || firebaseAppletConfig.appId,
   apiKey: getEnv('VITE_FIREBASE_API_KEY') || firebaseAppletConfig.apiKey,
@@ -32,5 +32,6 @@ const dbId = config.firestoreDatabaseId && config.firestoreDatabaseId.trim() !==
   : "(default)";
 
 export const db = getFirestore(app, dbId);
+
 
 
