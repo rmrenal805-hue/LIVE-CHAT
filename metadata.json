@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Customer Live Chat",
+  "description": "Real-time Customer Live Chat platform featuring a customizable embeddable widget, support agent workspace, AI copilot powered by Gemini, live visitor monitoring, and canned response library.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

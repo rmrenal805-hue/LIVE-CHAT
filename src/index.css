@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* Custom Scrollbar Styles for ultra-smooth scrolling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
+/* Ensure smooth native scrolling */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 7px Admin Typography Class */
+.admin-compact-mode {
+  font-size: 7px !important;
+  line-height: 1.25 !important;
+}
+
+/* User Notice Header Marquee Scrolling Animation */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.notice-marquee-track {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  white-space: nowrap;
+}
+
+.notice-marquee-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll 38s linear infinite;
+}
+
+.notice-marquee-text.speed-fast {
+  animation-duration: 24s;
+}
+
+.notice-marquee-text.speed-medium {
+  animation-duration: 38s;
+}
+
+.notice-marquee-text.speed-slow {
+  animation-duration: 55s;
+}
+
+.notice-marquee-text:hover,
+.notice-marquee-track:hover .notice-marquee-text {
+  animation-play-state: paused;
+}
+
