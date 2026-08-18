@@ -30,6 +30,16 @@ export const INITIAL_AGENTS: Agent[] = [
     status: 'away',
     department: 'বিলিং ও পেমেন্ট (Billing)',
     activeChatsCount: 0
+  },
+  {
+    id: 'agent_zoha',
+    name: 'জোহার আহমেদ (Zoha)',
+    email: 'zoha366@novachat.com',
+    role: 'সাপোর্ট এজেন্ট',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    status: 'online',
+    department: 'গ্রাহক সহায়তা ও লাইভ চ্যাট',
+    activeChatsCount: 0
   }
 ];
 
@@ -48,6 +58,24 @@ export const INITIAL_WIDGET_CONFIG: WidgetConfig = {
   websiteUrl: 'https://live-chat-swart-nine.vercel.app/',
   telegramBotToken: '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4',
   telegramChatId: '6331230671',
+  telegramBots: [
+    {
+      id: 'tg_bot_1',
+      name: 'টেলিগ্রাম নোটিফিকেশন বট ১ (Primary)',
+      botToken: '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4',
+      chatId: '6331230671',
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'tg_bot_2',
+      name: 'টেলিগ্রাম নোটিফিকেশন বট ২ (Multi)',
+      botToken: '8753033604:AAFE7Y99dJwN-F8h58OMywO1QW_7iqrkDcM',
+      chatId: '6081054558',
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    }
+  ],
   telegramNotificationsEnabled: true,
   noticeHeader: {
     enabled: true,

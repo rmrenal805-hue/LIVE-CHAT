@@ -77,6 +77,17 @@ export default function App() {
     return true;
   });
 
+  const [currentUser, setCurrentUser] = useState<{ id?: string; username?: string; name?: string; role?: string; email?: string } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('novachat_admin_profile') || localStorage.getItem('novachat_admin_user');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+
+  const isAgentRole = currentUser?.role === 'Agent' || currentUser?.username === 'zoha366' || currentUser?.username === 'arif' || currentUser?.username === 'tanvir';
+
   const [activeTab, setActiveTab] = useState<'widget_preview' | 'agent_workspace' | 'visitors' | 'canned' | 'settings' | 'admin'>(() => {
     if (typeof window === 'undefined') return 'widget_preview';
     const auth = localStorage.getItem('novachat_admin_auth') === 'true';
@@ -87,7 +98,19 @@ export default function App() {
         return 'widget_preview';
       }
     }
-    return auth ? 'admin' : 'widget_preview';
+    if (auth) {
+      try {
+        const saved = localStorage.getItem('novachat_admin_profile') || localStorage.getItem('novachat_admin_user');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.role === 'Agent' || parsed.username === 'zoha366' || parsed.username === 'arif' || parsed.username === 'tanvir') {
+            return 'agent_workspace';
+          }
+        }
+      } catch (e) {}
+      return 'admin';
+    }
+    return 'widget_preview';
   });
 
   // Track Admin Activity & Auto Logout after 30 Minutes of Inactivity
@@ -131,6 +154,7 @@ export default function App() {
           if (elapsed >= INACTIVITY_TIMEOUT_MS) {
             // Auto logout triggered due to 30 minutes inactivity
             setIsAdminLoggedIn(false);
+            setCurrentUser(null);
             localStorage.removeItem('novachat_admin_auth');
             localStorage.removeItem('novachat_admin_profile');
             localStorage.removeItem('novachat_admin_user');
@@ -139,7 +163,7 @@ export default function App() {
             setToastNotification({
               id: 'session_expired_' + Date.now(),
               sender: 'সিস্টেম সিকিউরিটি',
-              text: '৩০ মিনিট কোনো কার্যক্রম না থাকায় এডমিন সেশন স্বয়ংক্রিয়ভাবে লগআউট হয়েছে।',
+              text: '৩০ মিনিট কোনো কার্যক্রম না থাকায় সেশন স্বয়ংক্রিয়ভাবে লগআউট হয়েছে।',
             });
           }
         }
@@ -155,10 +179,16 @@ export default function App() {
   }, [isAdminLoggedIn]);
 
   useEffect(() => {
-    if (isAdminLoggedIn && activeTab === 'widget_preview') {
-      setActiveTab('admin');
+    if (isAdminLoggedIn) {
+      if (isAgentRole) {
+        if (activeTab === 'admin' || activeTab === 'settings' || activeTab === 'widget_preview') {
+          setActiveTab('agent_workspace');
+        }
+      } else if (activeTab === 'widget_preview') {
+        setActiveTab('admin');
+      }
     }
-  }, [isAdminLoggedIn, activeTab]);
+  }, [isAdminLoggedIn, isAgentRole, activeTab]);
 
   const [isConnected, setIsConnected] = useState(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
@@ -717,6 +747,7 @@ export default function App() {
 
       if (firestoreResult.success && firestoreResult.admin) {
         setIsAdminLoggedIn(true);
+        setCurrentUser(firestoreResult.admin);
         localStorage.setItem('novachat_admin_auth', 'true');
         localStorage.setItem('novachat_admin_profile', JSON.stringify(firestoreResult.admin));
         localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
@@ -727,6 +758,12 @@ export default function App() {
 
         if (firestoreResult.admin.role === 'Agent') {
           setActiveTab('agent_workspace');
+          const matched = agents.find(
+            (a) =>
+              (firestoreResult.admin.name && a.name.includes(firestoreResult.admin.name)) ||
+              (firestoreResult.admin.email && a.email === firestoreResult.admin.email)
+          );
+          if (matched) setActiveAgent(matched);
         } else {
           setActiveTab('admin');
         }
@@ -749,8 +786,9 @@ export default function App() {
 
       if (res.ok) {
         const data = await res.json();
-        if (data.success) {
+        if (data.success && data.user) {
           setIsAdminLoggedIn(true);
+          setCurrentUser(data.user);
           localStorage.setItem('novachat_admin_auth', 'true');
           localStorage.setItem('novachat_admin_user', JSON.stringify(data.user));
           localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
@@ -759,8 +797,14 @@ export default function App() {
           setAdminLoginError('');
           setIsAdminLoginLoading(false);
           
-          if (data.user && data.user.role === 'Agent') {
+          if (data.user.role === 'Agent') {
             setActiveTab('agent_workspace');
+            const matched = agents.find(
+              (a) =>
+                (data.user.name && a.name.includes(data.user.name)) ||
+                (data.user.email && a.email === data.user.email)
+            );
+            if (matched) setActiveAgent(matched);
           } else {
             setActiveTab('admin');
           }
@@ -773,6 +817,30 @@ export default function App() {
 
     // Static client-side fallback authentication
     const usernameInput = adminLoginUsername.trim().toLowerCase();
+    if (usernameInput === 'zoha366' && adminLoginPassword === '01723993331aa') {
+      const zohaProfile = {
+        id: 'agent_zoha366',
+        username: 'zoha366',
+        name: 'জোহার আহমেদ (Zoha)',
+        role: 'Agent',
+        email: 'zoha366@novachat.com',
+        department: 'গ্রাহক সহায়তা ও লাইভ চ্যাট',
+      };
+      setIsAdminLoggedIn(true);
+      setCurrentUser(zohaProfile);
+      localStorage.setItem('novachat_admin_auth', 'true');
+      localStorage.setItem('novachat_admin_profile', JSON.stringify(zohaProfile));
+      localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
+      setIsAdminLoginModalOpen(false);
+      setAdminLoginPassword('');
+      setAdminLoginError('');
+      setIsAdminLoginLoading(false);
+      setActiveTab('agent_workspace');
+      const zohaAgent = agents.find((a) => a.id === 'agent_zoha' || a.name.includes('Zoha') || a.name.includes('জোহার'));
+      if (zohaAgent) setActiveAgent(zohaAgent);
+      return;
+    }
+
     if (
       (usernameInput === 'saju2470' && adminLoginPassword === '20203494aa') ||
       (usernameInput === 'admin' && (adminLoginPassword === '20203494aa' || adminLoginPassword === 'admin123' || adminLoginPassword === 'admin')) ||
@@ -781,14 +849,23 @@ export default function App() {
       adminLoginPassword === '20203494aa' ||
       adminLoginPassword === 'admin123'
     ) {
+      const isAgent = usernameInput === 'arif' || usernameInput === 'tanvir';
+      const profile = {
+        id: isAgent ? `agent_${usernameInput}` : 'admin_super',
+        username: usernameInput || 'admin',
+        name: usernameInput === 'saju2470' ? 'Saju Ahmed' : isAgent ? (usernameInput === 'arif' ? 'আরিফ রহমান' : 'তানভীর আহমেদ') : 'Nova Admin',
+        role: isAgent ? 'Agent' : 'Super Admin',
+      };
       setIsAdminLoggedIn(true);
+      setCurrentUser(profile);
       localStorage.setItem('novachat_admin_auth', 'true');
+      localStorage.setItem('novachat_admin_profile', JSON.stringify(profile));
       localStorage.setItem('novachat_admin_last_activity', Date.now().toString());
       setIsAdminLoginModalOpen(false);
       setAdminLoginPassword('');
       setAdminLoginError('');
       setIsAdminLoginLoading(false);
-      if (usernameInput === 'arif' || usernameInput === 'tanvir') {
+      if (isAgent) {
         setActiveTab('agent_workspace');
       } else {
         setActiveTab('admin');
@@ -801,6 +878,7 @@ export default function App() {
 
   const handleAdminLogout = () => {
     setIsAdminLoggedIn(false);
+    setCurrentUser(null);
     localStorage.removeItem('novachat_admin_auth');
     localStorage.removeItem('novachat_admin_profile');
     localStorage.removeItem('novachat_admin_user');
@@ -1918,7 +1996,9 @@ export default function App() {
         openEmbedModal={() => setIsEmbedModalOpen(true)}
         openCodeGsModal={() => setIsCodeGsModalOpen(true)}
         unreadCount={unreadTotal}
+        liveVisitorsCount={liveVisitors.length}
         isAdminLoggedIn={isAdminLoggedIn}
+        currentUser={currentUser}
         openAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
         onAdminLogout={handleAdminLogout}
         isNotificationEnabled={isNotificationEnabled}
@@ -1956,7 +2036,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab 2: Support Agent Workspace (Admin only) */}
+        {/* Tab 2: Support Agent Workspace */}
         {activeTab === 'agent_workspace' && isAdminLoggedIn && (
           <div className="flex-1 flex overflow-hidden w-full relative">
             <div className={`w-full md:w-80 lg:w-96 shrink-0 h-full ${mobileWorkspaceView === 'chat' ? 'hidden md:flex' : 'flex'}`}>
@@ -2033,16 +2113,16 @@ export default function App() {
           />
         )}
 
-        {/* Tab 5: Settings & AI Config */}
-        {activeTab === 'settings' && isAdminLoggedIn && (
+        {/* Tab 5: Settings & AI Config (Super Admin Only) */}
+        {activeTab === 'settings' && isAdminLoggedIn && !isAgentRole && (
           <WidgetSettings
             widgetConfig={widgetConfig}
             onSaveSettings={handleSaveSettings}
           />
         )}
 
-        {/* Tab 6: Admin Control Panel */}
-        {activeTab === 'admin' && isAdminLoggedIn && (
+        {/* Tab 6: Admin Control Panel (Super Admin Only) */}
+        {activeTab === 'admin' && isAdminLoggedIn && !isAgentRole && (
           <AdminPanel
             agents={agents}
             chats={chats}

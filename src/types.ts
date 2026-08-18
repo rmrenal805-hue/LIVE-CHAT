@@ -261,6 +261,15 @@ export interface NoticeHeaderConfig {
   updatedAt?: string;
 }
 
+export interface TelegramBotConfig {
+  id: string;
+  name: string;
+  botToken: string;
+  chatId: string;
+  enabled: boolean;
+  createdAt?: string;
+}
+
 export interface WidgetConfig {
   primaryColor: string;
   headerTitle: string;
@@ -276,6 +285,7 @@ export interface WidgetConfig {
   websiteUrl?: string;
   telegramBotToken?: string;
   telegramChatId?: string;
+  telegramBots?: TelegramBotConfig[];
   telegramNotificationsEnabled?: boolean;
   noticeHeader?: NoticeHeaderConfig;
   promoBanner?: PromoBanner;

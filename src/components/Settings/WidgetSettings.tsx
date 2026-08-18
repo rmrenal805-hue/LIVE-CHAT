@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, Save, Check, Palette, Bot, Sliders, FileSpreadsheet, ExternalLink, RefreshCw, AlertCircle, Copy, Download, Code, CheckCircle2, Bell, Send } from 'lucide-react';
-import { WidgetConfig } from '../../types';
+import { Settings, Save, Check, Palette, Bot, Sliders, FileSpreadsheet, ExternalLink, RefreshCw, AlertCircle, Copy, Download, Code, CheckCircle2, Bell, Send, Plus, Trash2, ShieldCheck } from 'lucide-react';
+import { WidgetConfig, TelegramBotConfig } from '../../types';
 
 interface WidgetSettingsProps {
   widgetConfig: WidgetConfig;
@@ -17,8 +17,34 @@ const PRESET_COLORS = [
 ];
 
 export const WidgetSettings: React.FC<WidgetSettingsProps> = ({ widgetConfig, onSaveSettings }) => {
-  const [config, setConfig] = useState<WidgetConfig>({ ...widgetConfig });
+  const [config, setConfig] = useState<WidgetConfig>({
+    ...widgetConfig,
+    telegramBots: widgetConfig.telegramBots && widgetConfig.telegramBots.length > 0 ? widgetConfig.telegramBots : [
+      {
+        id: 'tg_bot_1',
+        name: 'টেলিগ্রাম নোটিফিকেশন বট ১ (Primary)',
+        botToken: widgetConfig.telegramBotToken || '8409188990:AAHR7bb3Zx9TcKpKEdldruvfVI-hRaoXfb4',
+        chatId: widgetConfig.telegramChatId || '6331230671',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'tg_bot_2',
+        name: 'টেলিগ্রাম নোটিফিকেশন বট ২ (Multi)',
+        botToken: '8753033604:AAFE7Y99dJwN-F8h58OMywO1QW_7iqrkDcM',
+        chatId: '6081054558',
+        enabled: true,
+        createdAt: new Date().toISOString(),
+      }
+    ]
+  });
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // New Telegram Bot Form Inputs
+  const [newBotName, setNewBotName] = useState('');
+  const [newBotToken, setNewBotToken] = useState('');
+  const [newBotChatId, setNewBotChatId] = useState('');
+  const [showAddBotModal, setShowAddBotModal] = useState(false);
 
   // Google Sheets Integration State
   const [webAppUrl, setWebAppUrl] = useState(
@@ -33,19 +59,25 @@ export const WidgetSettings: React.FC<WidgetSettingsProps> = ({ widgetConfig, on
 
   // Telegram Testing State
   const [testingTelegram, setTestingTelegram] = useState(false);
+  const [testingBotId, setTestingBotId] = useState<string | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
 
-  const handleTestTelegram = async () => {
+  const handleTestTelegram = async (bot?: TelegramBotConfig) => {
     setTestingTelegram(true);
+    setTestingBotId(bot?.id || 'all');
     setTelegramStatus(null);
     try {
       const res = await fetch('/api/telegram/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          botToken: config.telegramBotToken,
-          chatId: config.telegramChatId,
-        }),
+        body: JSON.stringify(
+          bot
+            ? { botToken: bot.botToken, chatId: bot.chatId }
+            : {
+                botToken: config.telegramBotToken,
+                chatId: config.telegramChatId,
+              }
+        ),
       });
       const data = await res.json();
       if (res.ok) {
@@ -57,7 +89,49 @@ export const WidgetSettings: React.FC<WidgetSettingsProps> = ({ widgetConfig, on
       setTelegramStatus({ error: err.message || 'নেটওয়ার্ক কানেকশন সমস্যা' });
     } finally {
       setTestingTelegram(false);
+      setTestingBotId(null);
     }
+  };
+
+  const handleAddTelegramBot = () => {
+    if (!newBotToken.trim() || !newBotChatId.trim()) {
+      alert('অনুগ্রহ করে টেলিগ্রাম Bot Token এবং Chat ID লিখুন!');
+      return;
+    }
+
+    const newBot: TelegramBotConfig = {
+      id: 'tg_bot_' + Date.now(),
+      name: newBotName.trim() || `টেলিগ্রাম বট #${(config.telegramBots?.length || 0) + 1}`,
+      botToken: newBotToken.trim(),
+      chatId: newBotChatId.trim(),
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedBots = [...(config.telegramBots || []), newBot];
+    setConfig({
+      ...config,
+      telegramBots: updatedBots,
+      telegramBotToken: config.telegramBotToken || newBot.botToken,
+      telegramChatId: config.telegramChatId || newBot.chatId,
+    });
+
+    setNewBotName('');
+    setNewBotToken('');
+    setNewBotChatId('');
+    setShowAddBotModal(false);
+  };
+
+  const handleToggleTelegramBot = (id: string) => {
+    const updatedBots = (config.telegramBots || []).map((b) =>
+      b.id === id ? { ...b, enabled: !b.enabled } : b
+    );
+    setConfig({ ...config, telegramBots: updatedBots });
+  };
+
+  const handleDeleteTelegramBot = (id: string) => {
+    const updatedBots = (config.telegramBots || []).filter((b) => b.id !== id);
+    setConfig({ ...config, telegramBots: updatedBots });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -583,21 +657,26 @@ function forwardSmsToNovaAdmin(phone, message, customerName) {
             </div>
           </div>
 
-          {/* Telegram Bot Notification Settings */}
+          {/* Telegram Bot Notification Settings (Multi-Bot Support) */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                <Bell className="w-4 h-4 text-blue-600" />
-                <span>টেলিগ্রাম বট নোটিফিকেশন সেটিংস (Telegram Bot Alerts)</span>
-              </h3>
-              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                ইনস্ট্যান্ট এসএমএস নোটিফিকেশন
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <span>মাল্টি-টেলিগ্রাম বট নোটিফিকেশন (Multi-Telegram Alerts)</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    একাধিক টেলিগ্রাম একাউন্ট ও গ্রুপে একযোগে ইনস্ট্যান্ট চ্যাট অ্যালার্ট ও রিপোর্ট পাঠান।
+                  </p>
+                </div>
+              </div>
+              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-blue-200">
+                {(config.telegramBots?.filter((b) => b.enabled).length || 0)} টি অ্যাকাউন্ট সক্রিয়
               </span>
             </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              নতুন কোনো কাস্টমার ওয়েবসাইট চ্যাটে বার্তা পাঠালে বা চ্যাট শুরু করলে সাথে সাথে আপনার টেলিগ্রাম গ্রুপ বা চ্যাটে অটোমেটিক ইনস্ট্যান্ট অ্যালার্ট নোটিফিকেশন মেসেজ চলে যাবে।
-            </p>
 
             <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
               <input
@@ -606,56 +685,164 @@ function forwardSmsToNovaAdmin(phone, message, customerName) {
                 onChange={(e) => setConfig({ ...config, telegramNotificationsEnabled: e.target.checked })}
                 className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
               />
-              <span>নতুন কাস্টমার মেসেজে টেলিগ্রাম নোটিফিকেশন অ্যালার্ট চালু রাখুন</span>
+              <span>নতুন কাস্টমার মেসেজ ও রিপোর্টে টেলিগ্রাম নোটিফিকেশন পাঠানো চালু রাখুন</span>
             </label>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block font-semibold text-xs text-slate-700 mb-1">
-                  Telegram Bot Token
-                </label>
-                <input
-                  type="text"
-                  placeholder="যেমন: 123456789:ABCdefGhIJK..."
-                  value={config.telegramBotToken || ''}
-                  onChange={(e) => setConfig({ ...config, telegramBotToken: e.target.value.trim() })}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-mono"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  টেলিগ্রামে <b>@BotFather</b> দিয়ে বট তৈরি করে বটের API Token এখানে দিন।
-                </p>
+            {/* List of Configured Telegram Bots */}
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-slate-800">সংযুক্ত টেলিগ্রাম বটের তালিকা:</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddBotModal(!showAddBotModal)}
+                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg flex items-center gap-1 transition border border-blue-200 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>নতুন টেলিগ্রাম বট যোগ করুন</span>
+                </button>
               </div>
 
-              <div>
-                <label className="block font-semibold text-xs text-slate-700 mb-1">
-                  Telegram Chat ID / Group ID
-                </label>
-                <input
-                  type="text"
-                  placeholder="যেমন: 987654321 বা -100123456789"
-                  value={config.telegramChatId || ''}
-                  onChange={(e) => setConfig({ ...config, telegramChatId: e.target.value.trim() })}
-                  className="w-full p-2.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-mono"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  <b>@userinfobot</b> বা গ্রুপে বট অ্যাড করে গ্রুপের Chat ID পাবেন।
-                </p>
+              {showAddBotModal && (
+                <div className="bg-slate-50 border border-blue-200 rounded-xl p-3.5 space-y-3">
+                  <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>নতুন টেলিগ্রাম চ্যানেল / বট যোগ করুন</span>
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">বট বা চ্যানেলের নাম</label>
+                      <input
+                        type="text"
+                        placeholder="যেমন: নোটিফিকেশন বট ৩"
+                        value={newBotName}
+                        onChange={(e) => setNewBotName(e.target.value)}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Telegram Bot Token *</label>
+                      <input
+                        type="text"
+                        placeholder="8753033604:AAFE7Y99..."
+                        value={newBotToken}
+                        onChange={(e) => setNewBotToken(e.target.value.trim())}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Chat ID / Group ID *</label>
+                      <input
+                        type="text"
+                        placeholder="6081054558"
+                        value={newBotChatId}
+                        onChange={(e) => setNewBotChatId(e.target.value.trim())}
+                        className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddBotModal(false)}
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition"
+                    >
+                      বাতিল
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddTelegramBot}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>যোগ করুন</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-2.5">
+                {(config.telegramBots || []).map((bot, index) => (
+                  <div
+                    key={bot.id || index}
+                    className={`p-3 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition ${
+                      bot.enabled ? 'bg-slate-50 border-slate-200' : 'bg-slate-100/60 border-slate-200 opacity-60'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span className="font-bold text-xs text-slate-900">{bot.name || `টেলিগ্রাম বট #${index + 1}`}</span>
+                        {bot.enabled ? (
+                          <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md">সক্রিয়</span>
+                        ) : (
+                          <span className="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-md">নিষ্ক্রিয়</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono flex-wrap">
+                        <span>Chat ID: <b className="text-slate-700">{bot.chatId}</b></span>
+                        <span className="text-slate-300">|</span>
+                        <span>Token: <b className="text-slate-700">{bot.botToken ? `${bot.botToken.slice(0, 10)}...${bot.botToken.slice(-6)}` : 'N/A'}</b></span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleTestTelegram(bot)}
+                        disabled={testingTelegram}
+                        className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 font-semibold text-[11px] rounded-lg border border-slate-200 hover:border-blue-200 flex items-center gap-1 transition cursor-pointer"
+                        title="এই বটের টেস্ট নোটিফিকেশন পাঠান"
+                      >
+                        {testingTelegram && testingBotId === bot.id ? (
+                          <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+                        ) : (
+                          <Send className="w-3 h-3 text-blue-600" />
+                        )}
+                        <span>টেস্ট পাঠান</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTelegramBot(bot.id)}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition cursor-pointer ${
+                          bot.enabled
+                            ? 'bg-white hover:bg-amber-50 text-amber-700 border-slate-200'
+                            : 'bg-white hover:bg-emerald-50 text-emerald-700 border-slate-200'
+                        }`}
+                      >
+                        {bot.enabled ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
+                      </button>
+
+                      {(config.telegramBots || []).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTelegramBot(bot.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
+            {/* Global Test and Status */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
               <button
                 type="button"
-                onClick={handleTestTelegram}
+                onClick={() => handleTestTelegram()}
                 disabled={testingTelegram}
-                className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition border border-blue-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
               >
-                {testingTelegram ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                {testingTelegram && testingBotId === 'all' ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
                 ) : (
-                  <Send className="w-3.5 h-3.5 text-blue-600" />
+                  <Send className="w-3.5 h-3.5 text-white" />
                 )}
-                <span>টেস্ট নোটিফিকেশন পাঠান</span>
+                <span>সকল সংযুক্ত টেলিগ্রামে একসাথে টেস্ট পাঠান</span>
               </button>
 
               {telegramStatus && (

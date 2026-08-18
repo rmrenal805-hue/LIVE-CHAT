@@ -27,7 +27,9 @@ interface HeaderProps {
   openEmbedModal: () => void;
   openCodeGsModal: () => void;
   unreadCount: number;
+  liveVisitorsCount?: number;
   isAdminLoggedIn: boolean;
+  currentUser?: { username?: string; name?: string; role?: string } | null;
   openAdminLoginModal: () => void;
   onAdminLogout: () => void;
   isNotificationEnabled?: boolean;
@@ -46,12 +48,16 @@ export const Header: React.FC<HeaderProps> = ({
   openEmbedModal,
   openCodeGsModal,
   unreadCount,
+  liveVisitorsCount = 0,
   isAdminLoggedIn,
+  currentUser,
   openAdminLoginModal,
   onAdminLogout,
   isNotificationEnabled = false,
   onRequestNotificationPermission
 }) => {
+  const isAgentRole = currentUser?.role === 'Agent' || currentUser?.username === 'zoha366' || currentUser?.username === 'arif' || currentUser?.username === 'tanvir';
+
   return (
     <header id="main-app-header" className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-sm select-none">
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
@@ -64,15 +70,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="flex items-center gap-1">
               <span className="font-bold text-xs sm:text-sm text-slate-100 tracking-tight whitespace-nowrap">নোভাচ্যাট</span>
-              <span className="text-[8px] font-semibold uppercase px-1 py-0.2 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 hidden xs:inline shrink-0">
-                লাইভ
+              <span className={`text-[8px] font-semibold uppercase px-1 py-0.2 rounded border hidden xs:inline shrink-0 ${
+                isAgentRole
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+              }`}>
+                {isAgentRole ? 'এজেন্ট' : 'লাইভ'}
               </span>
             </div>
           </div>
 
-          {/* Center Navigation Tabs (Segmented Switch) */}
+          {/* Center Navigation Tabs (Role-Based Segmented Switch) */}
           {isAdminLoggedIn ? (
-            <nav className="flex items-center bg-slate-800/95 p-0.5 rounded-lg border border-slate-700/70 shrink-0">
+            <nav className="flex items-center bg-slate-800/95 p-0.5 rounded-lg border border-slate-700/70 shrink-0 gap-0.5">
+              {/* 1. Inbox / Chat Workspace - Always Available */}
               <button
                 id="nav-agent-workspace-btn"
                 onClick={() => setActiveTab('agent_workspace')}
@@ -81,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
                 }`}
-                title="এজেন্ট ইনবক্স"
+                title="এজেন্ট ইনবক্স ও চ্যাট"
               >
                 <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>ইনবক্স</span>
@@ -92,33 +103,59 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </button>
 
+              {/* 2. Live Visitors - Available for Agent & Admin */}
               <button
-                id="nav-admin-panel-btn"
-                onClick={() => setActiveTab('admin')}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'admin'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
-                    : 'text-blue-300 hover:text-white hover:bg-slate-700/50'
+                id="nav-live-visitors-btn"
+                onClick={() => setActiveTab('visitors')}
+                className={`relative flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'visitors'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-emerald-300 hover:text-white hover:bg-slate-700/50'
                 }`}
-                title="অ্যাডমিন প্যানেল"
+                title="লাইভ ভিজিটর তালিকা"
               >
-                <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
-                <span>অ্যাডমিন</span>
+                <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 text-emerald-400" />
+                <span>লাইভ ভিজিটর</span>
+                {liveVisitorsCount > 0 && (
+                  <span className="bg-emerald-500/30 text-emerald-300 text-[8px] font-bold rounded-full px-1 py-0.2 border border-emerald-500/40 hidden sm:inline">
+                    {liveVisitorsCount}
+                  </span>
+                )}
               </button>
 
-              <button
-                id="nav-settings-btn"
-                onClick={() => setActiveTab('settings')}
-                className={`hidden md:flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'settings'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-                }`}
-                title="গুগল শিট সেটিংস"
-              >
-                <SettingsIcon className="w-3.5 h-3.5 shrink-0" />
-                <span>গুগল শিট</span>
-              </button>
+              {/* 3. Admin Panel - HIDDEN for Agent, Visible only for Super Admin */}
+              {!isAgentRole && (
+                <button
+                  id="nav-admin-panel-btn"
+                  onClick={() => setActiveTab('admin')}
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-md text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'admin'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
+                      : 'text-blue-300 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                  title="অ্যাডমিন প্যানেল"
+                >
+                  <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
+                  <span>অ্যাডমিন</span>
+                </button>
+              )}
+
+              {/* 4. Settings - HIDDEN for Agent, Visible only for Super Admin */}
+              {!isAgentRole && (
+                <button
+                  id="nav-settings-btn"
+                  onClick={() => setActiveTab('settings')}
+                  className={`hidden md:flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'settings'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  }`}
+                  title="গুগল শিট সেটিংস"
+                >
+                  <SettingsIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>গুগল শিট</span>
+                </button>
+              )}
             </nav>
           ) : (
             <div className="hidden sm:block text-xs text-slate-400 font-medium truncate">
@@ -128,6 +165,24 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Controls Bar */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            
+            {/* Logged in User Badge */}
+            {isAdminLoggedIn && currentUser && (
+              <div className="hidden lg:flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 rounded-lg border border-slate-700 text-xs">
+                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-slate-200 font-medium truncate max-w-[120px]">
+                  {currentUser.name || currentUser.username}
+                </span>
+                <span className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase ${
+                  isAgentRole
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {isAgentRole ? 'সাপোর্ট এজেন্ট' : 'এডমিন'}
+                </span>
+              </div>
+            )}
+
             
             {/* Notification Toggle Bell Button */}
             {onRequestNotificationPermission && (

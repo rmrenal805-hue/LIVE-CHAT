@@ -26,12 +26,9 @@ export const config = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(config) : getApp();
 
-// Get Firestore instance for specific database ID
-const dbId = config.firestoreDatabaseId && config.firestoreDatabaseId.trim() !== ""
-  ? config.firestoreDatabaseId
-  : "(default)";
+// Get Firestore instance
+export const db = getFirestore(app);
 
-export const db = getFirestore(app, dbId);
 
 
 

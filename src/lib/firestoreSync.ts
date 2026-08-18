@@ -89,17 +89,26 @@ export const DEFAULT_FIREBASE_ADMINS: AdminAccount[] = [
     department: 'বিলিং ও ডিপোজিট',
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'agent_zoha366',
+    username: 'zoha366',
+    password: '01723993331aa',
+    name: 'জোহার আহমেদ (Zoha)',
+    email: 'zoha366@novachat.com',
+    role: 'Agent',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+    status: 'online',
+    department: 'গ্রাহক সহায়তা ও লাইভ চ্যাট',
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 // Seed default admin users in Firestore if collection is empty
 export async function seedDefaultAdminUsersIfEmpty() {
   try {
-    const snap = await getDocs(collection(db, ADMIN_USERS_COL));
-    if (snap.empty) {
-      for (const admin of DEFAULT_FIREBASE_ADMINS) {
-        const ref = doc(db, ADMIN_USERS_COL, admin.id);
-        await setDoc(ref, JSON.parse(JSON.stringify(admin)), { merge: true });
-      }
+    for (const admin of DEFAULT_FIREBASE_ADMINS) {
+      const ref = doc(db, ADMIN_USERS_COL, admin.id);
+      await setDoc(ref, JSON.parse(JSON.stringify(admin)), { merge: true });
     }
   } catch (err) {
     console.warn('Error checking/seeding admin users in Firestore:', err);
